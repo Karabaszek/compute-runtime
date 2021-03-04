@@ -1,40 +1,52 @@
 components:
   gmmlib:
-    branch: gmmlib
-    clean_on_sync: true
     dest_dir: gmmlib
+    type: git
+    branch: gmmlib
+    revision: intel-gmmlib-20.3.2
     repository: https://github.com/intel/gmmlib.git
-    revision: 5b61c8a6b1882e4f83d339be6944dc1d434f3fa9
-    type: git
   igc:
-    branch: igc
-    clean_on_sync: true
     dest_dir: igc
-    repository: https://github.com/intel/intelgraphicscompiler
-    revision: 9508c9a18b964d500d7e343e081dd4213a590cb7
     type: git
+    branch: igc
+    revision: a402e1af602d96db18056933533dd740ef3a29d0
+    repository: https://github.com/intel/intelgraphicscompiler
   infra:
     branch: infra
-    clean_on_sync: true
     dest_dir: infra
-    revision: c82b72b8819f8b2b6cb08494415dc5565977e551
+    revision: 3d299fb1ae1dfb7e71af4dcb362b23a49a29b382
     type: git
   internal:
     branch: master
     dest_dir: internal
-    revision: 170916ffe6a2acaed65aa2b59c5c1b9993037c21
+    revision: FETCH_HEAD
     type: git
   kmdaf:
     branch: kmdaf
-    clean_on_sync: true
     dest_dir: kmdaf
-    revision: 70be2c96ab6a6ddbd8987b89f8818a6a0858ffdd
+    revision: 38a0f9a5c6226e7a994b18406758c0b68d660f2a
     type: git
+  level_zero:
+    branch: master
+    dest_dir: level_zero
+    repository: https://github.com/oneapi-src/level-zero
+    revision: v1.2.3
+    type: git
+  libva:
+    dest_dir: libva
+    type: git
+    branch: libva
+    revision: c9bb65b
+    repository: https://github.com/intel/libva.git
   wdk:
-    branch: wdk
-    clean_on_sync: true
     dest_dir: wdk
-    revision: 790647-1082
     type: git
-converter: M-1097
+    branch: wdk
+    revision: 941497647c2f00a57033f1948a93d0c091d96475-1611
+  wsl:
+    branch: wsl
+    dest_dir: wsl
+    revision: 56430997dac34ca0e9e18c177636234cac26ad54
+    type: git
+converter: M-1611
 version: '1'

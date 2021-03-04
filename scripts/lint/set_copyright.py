@@ -1,213 +1,254 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
-# Copyright (C) 2018 Intel Corporation
+# Copyright (C) 2018-2020 Intel Corporation
 #
 # SPDX-License-Identifier: MIT
 #
 
+"""Usage: ./scripts/lint/set_copyright.py <files>"""
+
 import re
 import sys
-import os.path
-from datetime import date
-from stat import ST_MODE
+import os
+import datetime
+import stat
+import argparse
 
-# count arguments, need at least 1
-if len(sys.argv) < 2:
-    print "need 1 argument, file\n"
-    sys.exit(0)
 
-header_cpp = """/*
- * Copyright (C) %s Intel Corporation
+def is_banned(path):
+    """Check if path is banned."""
+
+    banned_paths = [
+        'scripts/tests/copyright/in',
+        'scripts/tests/copyright/out',
+        'third_party'
+    ]
+
+    banned_files = [
+        'scripts/lint/set_copyright.sh'
+    ]
+
+    path_banned = False
+
+    for banned_file in banned_files:
+        if os.path.normpath(path) == os.path.normpath(banned_file):
+            path_banned = True
+            break
+
+    if not path_banned:
+        dirname = os.path.dirname(path)
+        for banned_path in banned_paths:
+            if dirname.startswith(banned_path):
+                path_banned = True
+                break
+
+    return path_banned
+
+
+def can_be_scanned(path):
+    """Check whether we should scan this file"""
+
+    allowed_extensions = [
+        'cpp', 'h', 'inl', 'hpp', 'm',
+        'cmake',
+        'py', 'sh',
+        'cl',
+        'exports'
+    ]
+
+    allowed_extensions_2 = [
+        'h.in', 'rc.in',
+        'options.txt'
+    ]
+
+    allowed_files = [
+        'CMakeLists.txt'
+    ]
+
+    path_ext = path.split('.')
+    path_ok = False
+    filename = os.path.basename(path)
+
+    if not os.path.isfile(path):
+        print(f'Cannot find file {path}, skipping')
+        path_ok = False
+
+    elif is_banned(path):
+        path_ok = False
+
+    elif filename in allowed_files:
+        path_ok = True
+
+    elif path_ext[-1].lower() in allowed_extensions:
+        path_ok = True
+
+    elif '.'.join(path_ext[-2:]) in allowed_extensions_2:
+        path_ok = True
+
+    if not path_ok:
+        print(f'[MIT] Ignoring file: {path}')
+
+    return path_ok
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description='Usage: ./scripts/lint/set_copyright.py <files>')
+    parser.add_argument('-c', '--check', action='store_true', help='Checks only, not changing files, fails if wrong copyright')
+    parser.add_argument('files', nargs='*')
+    args = parser.parse_args()
+
+    return vars(args)
+
+
+def main(args):
+    header_cpp = """/*
+ * Copyright (C) {} Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  *
  */
 """
 
-header_bash_style = """#
-# Copyright (C) %s Intel Corporation
+    header_bash_style = """#
+# Copyright (C) {} Intel Corporation
 #
 # SPDX-License-Identifier: MIT
 #
 """
 
-allowed_extensions = [
-    'cpp', 'h', 'inl', 'hpp', 'm',
-    'cmake',
-    'py', 'sh',
-    'cl',
-    'exports'
-]
+    cpp_sharp_lines = [
+        '#pragma',
+        '#include'
+    ]
 
-allowed_extensions_2 = [
-    'h.in',
-    'options.txt'
-]
+    status = 0
 
-allowed_files = [
-    'CMakeLists.txt'
-]
+    for path in args['files']:
 
-banned_paths = [
-    'scripts/tests/copyright/in',
-    'scripts/tests/copyright/out'
-]
+        # avoid self scan
+        if os.path.abspath(path) == os.path.abspath(sys.argv[0]):
+            continue
 
-cpp_sharp_lines = [
-    '#pragma',
-    '#include'
-]
+        if not can_be_scanned(path):
+            continue
 
-def isBanned(path):
-    path_ok = False
-    for banned_path in banned_paths:
-        if dirname.startswith(banned_path):
-            path_ok = True
-            break
-    return path_ok
+        print(f'[MIT] Processing file: {path}')
 
-for path in sys.argv:
+        gathered_lines = []
+        gathered_header = []
+        start_year = None
+        header = header_cpp
+        header_start = '/*'
+        header_end = '*/'
+        comment_char = r'\*'
 
-    # avoid self scan
-    if os.path.abspath(path) == os.path.abspath(sys.argv[0]):
-        continue
+        # now read line by line
+        with open(path) as fin:
 
-    # check whether we should scan this file
-    path_ext = path.split('.')
-    path_ok = False
-    filename = os.path.basename(path)
-    dirname = os.path.dirname(path)
-    while True:
-        if isBanned(path):
-            path_ok = False
-            break
+            # take care of hashbang
+            first_line = fin.readline()
+            if not first_line.startswith('#!'):
+                line = first_line
+                first_line = ''
+            else:
+                line = fin.readline()
 
-        if filename in allowed_files:
-            path_ok = True
-            break
+            is_cpp = False
 
-        if path_ext[-1].lower() in allowed_extensions:
-            path_ok = True
-            break
+            # check whether comment type is '#'
+            if first_line or line.startswith('#'):
+                for i in cpp_sharp_lines:
+                    print(f'a: {i} ~ {line}')
+                    if line.startswith(i):
+                        is_cpp = True
+                        break
 
-        if '.'.join(path_ext[-2:]) in allowed_extensions_2:
-            path_ok = True
-            break
-        break
+                if not is_cpp:
+                    header_start = '#'
+                    header_end = '\n'
+                    header = header_bash_style
+                    comment_char = '#'
 
-    if not path_ok:
-        print "[MIT] Ignoring file: %s" % path
-        continue
+            curr_comment = []
 
-    # check that first arg is a existing file
-    if not os.path.isfile(path):
-        print "cannot find file %s, skipping" % path
-        continue
+            is_header = None
+            is_header_end = None
 
-    print "[MIT] Processing file: %s" % path
+            # copyright have to be first comment in file
+            if line.startswith(header_start):
+                is_header = True
+                is_header_end = False
+            else:
+                is_header = False
+                is_header_end = True
 
-    L = list()
-    start_year = None
-    header = header_cpp
-    header_start = '/*'
-    header_end = '*/'
-    comment_char = "\*"
+            is_copyright = False
 
-    # now read line by line
-    f = open(path, 'r')
+            while line:
+                if is_header:
+                    if header_end == '\n' and len(line.strip()) == 0:
+                        is_header = False
+                        is_header_end = True
+                    elif line.strip().endswith(header_end):
+                        is_header = False
+                        is_header_end = True
+                    elif 'Copyright' in line:
+                        expr = (rf'^{comment_char} Copyright \([Cc]\) (\d+)( *- *\d+)?')
+                        match = re.match(expr, line.strip())
+                        if match:
+                            start_year = match.groups()[0]
+                            curr_comment = []
+                            is_copyright = True
+                    if not is_copyright:
+                        curr_comment.append(line)
+                    gathered_header.append(line)
 
-    # take care of hashbang
-    first_line = f.readline()
-    if not first_line.startswith( '#!' ):
-        line = first_line
-        first_line = ''
-    else:
-        line = f.readline()
+                elif is_copyright and is_header_end:
+                    if len(line.strip()) > 0:
+                        gathered_lines.append(line)
+                        is_header_end = False
+                    else:
+                        gathered_header.append(line)
+                else:
+                    gathered_lines.append(line)
 
-    # check whether comment type is '#'
-    try:
-        if first_line or line.startswith('#'):
-            for a in cpp_sharp_lines:
-                print "a: %s ~ %s" % (a, line)
-                if line.startswith(a):
-                    raise "c++"
-            header_start = '#'
-            header_end = '\n'
-            header = header_bash_style
-            comment_char = "#"
-    except:
-        pass
+                line = fin.readline()
 
-    curr_comment = list()
+        year = datetime.datetime.now().year
+        if start_year is None:
+            start_year = str(year)
+        elif int(start_year) < year:
+            start_year += '-'
+            start_year += str(year)
 
-    # copyright have to be first comment in file
-    if line.startswith(header_start):
-        isHeader = True
-        isHeaderEnd = False
-    else:
-        isHeader = False
-        isHeaderEnd = True
+        written_header = [header.format(start_year)]
 
-    isCopyright = False
+        if len(curr_comment) > 0 or len(gathered_lines) > 0:
+            written_header.append('\n')
 
-    while (line):
-        if isHeader:
-            if header_end == '\n' and len(line.strip()) == 0:
-                isHeader = False
-                isHeaderEnd = True
-            elif line.strip().endswith(header_end):
-                isHeader = False
-                isHeaderEnd = True
-            elif "Copyright" in line:
-                tmp = line.split(',')
-                expr  = ("^%s Copyright \([Cc]\) (\d+)( *- *\d+)?" % comment_char)
-                m = re.match(expr, line.strip())
-                if not m is None:
-                    start_year = m.groups()[0]
-                    curr_comment = list()
-                    isCopyright = True
-            if not isCopyright:
-                curr_comment.append(line)
-        elif isCopyright and isHeaderEnd:
-            if len(line.strip()) > 0:
-                L.append(line)
-                isHeaderEnd = False
-        else:
-            L.append(line)
+        if len(curr_comment) > 0:
+            written_header.append(''.join(curr_comment))
 
-        line = f.readline()
+        if not args['check']:
+            # store file mode because we want to preserve this
+            old_mode = os.stat(path)[stat.ST_MODE]
+            os.remove(path)
+            with open(path, 'w') as fout:
+                if first_line:
+                    fout.write(first_line)
 
-    f.close()
+                fout.write(''.join(written_header))
+                contents = ''.join(gathered_lines)
+                fout.write(contents)
 
-    year = date.today().year
-    if start_year is None:
-        start_year = str(year)
-    elif int(start_year) < year:
-        start_year += "-"
-        start_year += str(year)
+                # chmod to original value
+                os.chmod(path, old_mode)
 
-    # store file mode because we want to preserve this
-    old_mode = os.stat(path)[ST_MODE]
+        if args['check'] and ''.join(gathered_header) != ''.join(written_header):
+            status = 1
 
-    os.remove(path)
-    f = open(path, 'w')
+    return status
 
-    if first_line:
-        f.write(first_line)
 
-    f.write(header % start_year)
-
-    if len(curr_comment)>0 or len(L)>0:
-        f.write("\n")
-
-    if len(curr_comment)>0:
-        f.write(''.join(curr_comment))
-
-    contents = ''.join(L)
-    f.write(contents)
-    f.close()
-
-    # chmod to original value
-    os.chmod(path, old_mode)
-
-    del L[:]
+if __name__ == '__main__':
+    sys.exit(main(_parse_args()))

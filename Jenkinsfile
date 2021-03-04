@@ -1,5 +1,2 @@
 #!groovy
-neoDependenciesRev='803657-1097'
-strategy='EQUAL'
-allowedCD=274
-allowedF=4
+dependenciesRevision='941497647c2f00a57033f1948a93d0c091d96475-1611'

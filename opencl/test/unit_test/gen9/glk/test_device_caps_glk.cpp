@@ -1,0 +1,59 @@
+/*
+ * Copyright (C) 2017-2020 Intel Corporation
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ */
+
+#include "opencl/test/unit_test/fixtures/cl_device_fixture.h"
+#include "test.h"
+
+using namespace NEO;
+
+typedef Test<ClDeviceFixture> Gen9DeviceCaps;
+
+GLKTEST_F(Gen9DeviceCaps, WhenCheckingProfilingTimerResolutionThenCorrectResolutionIsReturned) {
+    const auto &caps = pDevice->getDeviceInfo();
+    EXPECT_EQ(52u, caps.outProfilingTimerResolution);
+}
+
+GLKTEST_F(Gen9DeviceCaps, givenGlkDeviceWhenAskedForDoubleSupportThenTrueIsReturned) {
+    EXPECT_TRUE(pDevice->getHardwareInfo().capabilityTable.ftrSupportsFP64);
+}
+
+GLKTEST_F(Gen9DeviceCaps, GlkIs32BitOsAllocatorAvailable) {
+    const auto &caps = pDevice->getDeviceInfo();
+    auto memoryManager = pDevice->getMemoryManager();
+    if (is64bit) {
+        EXPECT_TRUE(memoryManager->peekForce32BitAllocations());
+        EXPECT_TRUE(caps.force32BitAddressess);
+    } else {
+        EXPECT_FALSE(memoryManager->peekForce32BitAllocations());
+        EXPECT_FALSE(caps.force32BitAddressess);
+    }
+}
+
+typedef Test<ClDeviceFixture> GlkUsDeviceIdTest;
+
+GLKTEST_F(GlkUsDeviceIdTest, WhenCheckingIsSimulationThenTrueReturnedOnlyForSimulationId) {
+    unsigned short glkSimulationIds[3] = {
+        0x3184,
+        0x3185,
+        0, // default, non-simulation
+    };
+    NEO::MockDevice *mockDevice = nullptr;
+    for (auto id : glkSimulationIds) {
+        mockDevice = createWithUsDeviceId(id);
+        ASSERT_NE(mockDevice, nullptr);
+        EXPECT_FALSE(mockDevice->isSimulation());
+        delete mockDevice;
+    }
+}
+
+GLKTEST_F(GlkUsDeviceIdTest, GivenGLKWhenCheckftr64KBpagesThenFalse) {
+    EXPECT_FALSE(pDevice->getHardwareInfo().capabilityTable.ftr64KBpages);
+}
+
+GLKTEST_F(GlkUsDeviceIdTest, givenGlkWhenCheckFtrSupportsInteger64BitAtomicsThenReturnFalse) {
+    EXPECT_FALSE(pDevice->getHardwareInfo().capabilityTable.ftrSupportsInteger64BitAtomics);
+}
